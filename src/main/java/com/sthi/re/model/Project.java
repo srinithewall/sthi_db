@@ -1,5 +1,6 @@
 package com.sthi.re.model;
 
+import com.sthi.re.enums.SourceType;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -47,11 +48,18 @@ public class Project {
     @Column(name = "website_url")
     private String websiteUrl;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "source_type")
-    private String sourceType;
+    private SourceType sourceType;
 
     @Column(name = "source_name")
     private String sourceName;
+
+    @Column(name = "is_scraped")
+    private Boolean isScraped = false;
+
+    @Column(name = "scraper_source")
+    private String scraperSource;
 
     /**
      * 1 = Verified
@@ -160,11 +168,11 @@ public class Project {
         this.websiteUrl = websiteUrl;
     }
 
-    public String getSourceType() {
+    public SourceType getSourceType() {
         return sourceType;
     }
 
-    public void setSourceType(String sourceType) {
+    public void setSourceType(SourceType sourceType) {
         this.sourceType = sourceType;
     }
 
@@ -174,6 +182,22 @@ public class Project {
 
     public void setSourceName(String sourceName) {
         this.sourceName = sourceName;
+    }
+
+    public Boolean getIsScraped() {
+        return isScraped;
+    }
+
+    public void setIsScraped(Boolean isScraped) {
+        this.isScraped = isScraped;
+    }
+
+    public String getScraperSource() {
+        return scraperSource;
+    }
+
+    public void setScraperSource(String scraperSource) {
+        this.scraperSource = scraperSource;
     }
 
     public Integer getIsVerified() {

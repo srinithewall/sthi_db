@@ -1,0 +1,105 @@
+############################################
+# REAL ESTATE – ENTITY DEFINITIONS
+# Used by schema generator
+############################################
+
+# =====================
+# MASTER TABLES
+# =====================
+
+ENTITY Developer re_developers
+developerId:Long:developer_id
+developerName:String:developer_name
+description:String:description
+websiteUrl:String:website_url
+contactEmail:String:contact_email
+contactPhone:String:contact_phone
+status:Integer:status
+createdAt:LocalDateTime:created_at
+updatedAt:LocalDateTime:updated_at
+END
+
+ENTITY ProjectType re_project_types
+projectTypeId:Integer:project_type_id
+name:String:name
+status:Integer:status
+createdAt:LocalDateTime:created_at
+updatedAt:LocalDateTime:updated_at
+END
+
+ENTITY Amenity re_amenities
+amenityId:Integer:amenity_id
+name:String:name
+icon:String:icon
+status:Integer:status
+createdAt:LocalDateTime:created_at
+updatedAt:LocalDateTime:updated_at
+END
+
+ENTITY UnitType re_unit_types
+unitTypeId:Integer:unit_type_id
+name:String:name
+description:String:description
+status:Integer:status
+createdAt:LocalDateTime:created_at
+updatedAt:LocalDateTime:updated_at
+END
+
+# =====================
+# TRANSACTIONAL TABLES
+# =====================
+
+ENTITY Project re_projects
+projectId:Long:project_id
+projectName:String:project_name
+reraNumber:String:rera_number
+description:String:description
+status:String:status
+developerId:Long:developer_id
+projectTypeId:Integer:project_type_id
+createdBy:Integer:created_by
+updatedBy:Integer:updated_by
+createdAt:LocalDateTime:created_at
+updatedAt:LocalDateTime:updated_at
+END
+
+ENTITY Location re_locations
+locationId:Long:location_id
+projectId:Long:project_id
+latitude:Double:latitude
+longitude:Double:longitude
+city:String:city
+area:String:area
+zone:String:zone
+addressLine:String:address_line
+createdAt:LocalDateTime:created_at
+updatedAt:LocalDateTime:updated_at
+END
+
+ENTITY ProjectUnitType re_project_unit_types
+projectUnitTypeId:Long:project_unit_type_id
+projectId:Long:project_id
+unitTypeId:Integer:unit_type_id
+sizeSqft:Integer:size_sqft
+priceMin:Double:price_min
+priceMax:Double:price_max
+priceUnit:String:price_unit
+createdAt:LocalDateTime:created_at
+updatedAt:LocalDateTime:updated_at
+END
+
+ENTITY ProjectImage re_project_images
+projectImageId:Long:project_image_id
+projectId:Long:project_id
+imageUrl:String:image_url
+sortOrder:Integer:sort_order
+createdAt:LocalDateTime:created_at
+updatedAt:LocalDateTime:updated_at
+END
+
+ENTITY ProjectAmenity re_project_amenities
+projectAmenityId:Long:project_amenity_id
+projectId:Long:project_id
+amenityId:Integer:amenity_id
+createdAt:LocalDateTime:created_at
+END

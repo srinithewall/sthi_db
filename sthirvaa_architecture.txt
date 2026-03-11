@@ -1,0 +1,272 @@
+Sthirvaa Platform
+Microservices Architecture & Database Design
+Based on Schema Analysis  |  March 2026
+1. Current Schema Analysis
+The existing sthi database (MySQL 8.0) contains 35 tables across clearly identifiable domains. Here is what was observed:
+1.1  Table Inventory by Domain
+Domain
+Tables
+Notes / Observations
+Real Estate Inventory
+re_projects, re_properties, re_locations, re_project_locations, re_developers, re_project_types, re_unit_types, re_amenities, re_construction_status
+Core marketplace data. Well-structured with good indexes.
+RE Media & Content
+re_project_images, re_project_videos, re_project_brochures, re_project_documents, re_property_images, re_property_videos, re_property_documents
+Media assets stored as URL paths (Cloudflare R2). Separate for projects vs resale properties.
+RE Associations
+re_project_amenities, re_project_tags, re_project_unit_types, re_property_amenities, re_property_tags
+Junction tables. Note: re_project_advisors has a UNIQUE KEY on project_id only — allows 1 advisor per project maximum.
+CRM / Leads
+re_leads, re_lead_routing_config, re_project_advisors, re_property_advisors
+Lead capture with routing config. advisor_whatsapp_link is pre-generated and stored in the row — fragile.
+Auth & Users
+users, roles, user_types, user_privileges, privileges, re_otp_verification
+OTP-based phone auth present. users table has legacy columns (astro, journel, shopping) from a prior platform.
+Tags & Search
+re_tags, re_project_tags, re_property_tags
+Tag system supports FEATURE, PROPERTY_TYPE, VALUE, AMENITY, FACING, PROJECT_STATUS types.
+Finance / Commerce
+wallet, transaction, vouchers, investments, investment_types, products, vendors, categories
+Full commerce layer exists but appears unused for real estate. Likely from a prior product.
+Notifications
+notifications
+Generic push/in-app notification table with metadata JSON.
+1.2  Key Issues Identified
+Several structural and data quality problems need addressing before or during migration:
+Duplicate location tables: re_locations and re_project_locations both exist and overlap. Many projects have entries in both. Consolidate to re_project_locations.
+re_project_advisors UNIQUE KEY is on project_id only — this limits a project to one advisor. This is likely a bug, not intentional.
+price_unit inconsistency: Values like 'L', 'l', 'Lac', 'CR', 'Cr', 'cr', ' Cr' (with spaces) are all present. Needs normalization.
+advisor_whatsapp_link stored as pre-generated URL in re_leads: this is fragile — if advisor phone changes, old rows are stale.
+users table has orphan columns (astro, journel, shopping, profile_pic as TINYBLOB) from a prior non-RE product.
+Mixed source_name/source_type NULLs in re_projects — scraper-ingested rows can be identified but not consistently queried.
+No foreign key from re_properties to re_project_locations — properties lack a structured lat/lng association through the location model.
+2. Recommended Microservices Architecture
+Based on the schema analysis and the high-level platform overview, the platform should be split into 6 bounded services. Each service owns its data and communicates via REST API or events through n8n.
+Service
+DB
+Owns These Tables
+Purpose
+inventory-service
+MySQL (sthi)
+re_projects, re_properties, re_developers, re_locations, re_project_locations, re_amenities, re_construction_status, re_project_types, re_unit_types, re_tags, re_project_amenities, re_project_tags, re_property_amenities, re_property_tags, re_project_unit_types
+Core listing engine. Search, filter, geospatial queries, RERA data.
+media-service
+MySQL (sthi)
+re_project_images, re_project_videos, re_project_brochures, re_project_documents, re_property_images, re_property_videos, re_property_documents
+Manages uploads to Cloudflare R2, thumbnail generation, sort order.
+user-service
+MySQL (sthi)
+users, roles, user_types, user_privileges, privileges, re_otp_verification
+Auth (OTP + password), JWT tokens, role-based access, advisor profiles.
+crm-service
+MySQL (sthi)
+re_leads, re_lead_routing_config, re_project_advisors, re_property_advisors
+Lead capture, routing rules, advisor assignment, follow-up scheduling via n8n.
+agreement-service
+PostgreSQL (new)
+agreements, agreement_events, document_templates, esign_requests, stamp_papers
+Digital agreements, Aadhaar e-Sign via Leegality/eMudhra, audit trail.
+notification-service
+Redis + MySQL
+notifications
+Dispatch SMS, WhatsApp, push, email. Queue-backed via Redis.
+2.1  Why Keep 4 Services on the Same MySQL DB (For Now)
+Since inventory, media, user, and CRM tables are already in the same MySQL instance and share implicit FKs (e.g. advisor_id in re_leads references users.id), splitting them into completely separate databases immediately would require either:
+Removing cross-service foreign keys and accepting eventual consistency, or
+Running a data migration that copies/denormalizes user data into the CRM schema.
+The pragmatic approach is to logically isolate them as separate Spring Boot services that each access their own schema namespace or own set of tables within the same MySQL instance. You can then physically separate them when traffic justifies it.
+The agreement-service must be on PostgreSQL from day one — it needs append-only event sourcing, JSONB for clause negotiation, and row-level locking for legal document state transitions.
+3. Per-Service Database Design
+3.1  Inventory Service — Changes Needed
+Change
+Action
+Reason
+Merge location tables
+Deprecate re_locations, migrate data to re_project_locations
+Duplicate tables cause confusion and divergent data
+Normalize price_unit
+Add ENUM constraint: ('L','Lac','Cr','Thou')
+Free text causes incorrect sorting and display
+Fix advisor UNIQUE KEY
+Change UNIQUE(project_id) to UNIQUE(project_id, advisor_user_id)
+Allows multiple advisors per project
+Add source tracking
+Make source_type ENUM: ('MANUAL','SCRAPER','API','IMPORT')
+Enables filtering scraped vs verified listings
+Add is_scraped flag
+Add is_scraped BIT, scraper_source VARCHAR(255) to re_projects
+Supports scraper reconciliation workflow
+Add scraper staging table
+Create re_projects_staging with same columns + merge_status
+Prevents raw scraper writes to production listings
+3.2  CRM Service — New Tables Needed
+The current leads system is minimal. As you build out the CRM / Marketing layer from your diagram, the following additions are needed:
+New Table
+Key Columns
+Purpose
+re_lead_activities
+id, lead_id, activity_type, notes, performed_by, created_at
+Track every touchpoint — call, WhatsApp message, site visit, follow-up
+re_lead_stages
+id, stage_name, stage_code, sequence, is_active
+Pipeline stages: NEW → QUALIFIED → SITE_VISIT → NEGOTIATION → CLOSED
+re_campaigns
+id, campaign_name, campaign_type, target_audience_json, status, created_by
+Marketing campaigns for CPAS / bulk messaging
+re_campaign_leads
+id, campaign_id, lead_id, status, response, sent_at
+Track which leads were part of which campaign
+re_followup_schedule
+id, lead_id, scheduled_at, channel (SMS/WA/CALL), assigned_to, status
+Automated follow-up queue consumed by n8n
+3.3  Agreement Service — New PostgreSQL Schema
+This is a greenfield schema on PostgreSQL. Designed for legal validity, audit trail, and Aadhaar e-Sign integration:
+Table
+Key Columns
+Notes
+agreements
+id UUID, agreement_type (RENTAL/SALE/MOU/JDA), status, property_id, parties JSONB, terms JSONB, created_at, updated_at
+Master agreement record. Terms stored as JSONB to support negotiation.
+agreement_events
+id, agreement_id, event_type, old_value JSONB, new_value JSONB, performed_by, created_at
+Append-only event log. Never update, only insert. Full audit trail.
+agreement_parties
+id, agreement_id, party_type (OWNER/BUYER/TENANT), name, aadhaar_ref, phone, email, esign_status
+Each party to the agreement. Aadhaar ref — not the actual number.
+esign_requests
+id, agreement_id, party_id, provider (LEEGALITY/EMUDHRA), request_id, status, signed_at, callback_data JSONB
+Tracks each e-Sign request and response from the provider.
+document_templates
+id, template_name, agreement_type, template_body TEXT, version, is_active
+Legal templates per agreement type. Versioned.
+stamp_paper_records
+id, agreement_id, stamp_value, shcil_reference, state, purchased_at, status
+e-Stamp paper records from SHCIL.
+4. Inter-Service Communication & n8n Orchestration
+4.1  Communication Patterns
+Flow
+Mechanism
+Example
+Synchronous queries
+REST API (internal)
+crm-service calls inventory-service to get project name for a lead
+Async workflows
+n8n webhook triggers
+New lead created → n8n → assign advisor → send WhatsApp → schedule follow-up
+Scraper → Inventory
+n8n staging ingestion job
+Scraper writes to re_projects_staging → n8n dedup job → push to re_projects
+Agreement events
+REST + webhook
+esign callback from Leegality → agreement-service → notify CRM lead as AGREEMENT_SIGNED
+Notifications
+notification-service REST
+Any service calls POST /notifications/send with channel and payload
+4.2  n8n Workflow Map
+Your existing n8n instance on Docker handles orchestration. These are the key workflows to build:
+Lead Intake Flow: Webhook → Validate → Routing Config lookup → Assign Advisor → WhatsApp notification → Create followup_schedule row
+Scraper Reconciliation: Cron trigger → Query re_projects_staging → Deduplicate against re_projects by RERA number → Insert/skip → Mark merge_status
+Follow-up Scheduler: Cron every 15 mins → Query re_followup_schedule for due rows → Send WhatsApp/SMS via provider → Update status
+Agreement Signed: Webhook from Leegality/eMudhra → Update esign_requests → Update agreement status → Notify advisor via CRM → Trigger stamp delivery
+Marketing Campaign: Campaign created → Query matching lead profiles → Batch send via Bulk Message Shooter → Log to re_campaign_leads
+5. Docker Compose Service Layout
+Based on your current EC2 deployment, here is the recommended Docker Compose structure with services isolated by port and network:
+Container
+Port
+DB Connection
+Notes
+inventory-service
+8081
+MySQL sthi (re_ tables)
+Spring Boot. Highest read load — scale first.
+media-service
+8082
+MySQL sthi (media tables)
+Handles R2 signed URLs and upload callbacks.
+user-service
+8083
+MySQL sthi (users tables)
+Issues JWT. All other services validate JWT here.
+crm-service
+8084
+MySQL sthi (leads, campaigns)
+Connected to n8n for workflow triggers.
+agreement-service
+8085
+PostgreSQL (agreements DB)
+New service. PG only. Legal audit trail.
+notification-service
+8086
+Redis + MySQL notifications
+Queue-backed. Redis for pub-sub.
+nginx
+80/443
+Reverse proxy
+Routes /api/inventory/* → 8081, etc.
+n8n
+5678
+Internal + webhooks
+Orchestration hub. Calls all services.
+mysql
+3306
+Shared MySQL
+Logical separation by table prefix today.
+postgres
+5432
+Agreement DB
+Only agreement-service connects here.
+phpmyadmin
+8080
+mysql
+Admin only. Not public-facing.
+redis
+6379
+In-memory
+Notification queue + JWT token blocklist.
+6. Migration Roadmap
+Phase
+Work
+Outcome
+Phase 1 — Stabilize
+(Now → 4 weeks)
+1. Fix price_unit inconsistency
+2. Create re_projects_staging table
+3. Fix advisor UNIQUE KEY bug
+4. Merge re_locations into re_project_locations
+5. Add source_type ENUM to re_projects
+Clean, consistent data. Scraper can write safely.
+Phase 2 — Service Isolation
+(4–8 weeks)
+1. Create separate Spring Boot modules for inventory, crm, user, media
+2. Each module has its own @Repository layer
+3. No cross-module direct DB calls
+4. Add API Gateway / nginx routing per service
+Logical microservices on shared DB. Low risk.
+Phase 3 — Agreement Service
+(8–12 weeks)
+1. Stand up PostgreSQL container
+2. Build agreement-service from scratch
+3. Integrate Leegality API for Aadhaar e-Sign
+4. Launch rental agreement flow for Bangalore market
+Revenue-generating digital agreements live.
+Phase 4 — CRM + Marketing
+(12–20 weeks)
+1. Build CRM pipeline tables
+2. Campaign management
+3. n8n follow-up workflows
+4. AI digital marketing (auto-follow-ups based on profiles)
+Full CRM + marketing automation.
+Phase 5 — Physical DB Split
+(When traffic justifies)
+1. Migrate crm tables to separate MySQL instance
+2. Replace cross-DB FKs with API calls
+3. Add event bus (Redis Streams or simple n8n webhooks)
+True microservices. Independent scaling.
+7. Immediate Action Items
+The following can be actioned right now without any architectural risk:
+Run a data cleanup migration to normalize price_unit values (L → Lac, Cr → Cr, strip spaces)
+Change the UNIQUE KEY on re_project_advisors from (project_id) to (project_id, advisor_user_id)
+Create re_projects_staging table and update your scraper to write there instead of re_projects directly
+Add source_type ENUM column to re_projects and backfill existing rows as MANUAL
+Remove advisor_whatsapp_link from re_leads — generate it dynamically in crm-service at query time using advisor's phone from users table
+Plan the PostgreSQL container and agreement-service module structure (can start coding independently)

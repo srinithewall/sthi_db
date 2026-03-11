@@ -1,80 +1,23 @@
 package com.sthi.re.service.impl;
 
 import com.sthi.model.Users;
-import java.util.stream.Collectors;
-import com.sthi.re.dto.request.AddProjectRequest;
-import com.sthi.re.dto.request.LocationRequest;
-import com.sthi.re.dto.request.ProjectBrochureRequest;
-import com.sthi.re.dto.request.ProjectDocumentRequest;
-import com.sthi.re.dto.request.ProjectImageRequest;
-import com.sthi.re.dto.request.ProjectSearchRequest;
-import com.sthi.re.dto.request.ProjectUnitTypeRequest;
-import com.sthi.re.dto.request.ProjectVideoRequest;
-import com.sthi.re.dto.request.UpdateProjectRequest;
-import com.sthi.re.dto.response.ConstructionStatusDto;
-import com.sthi.re.dto.response.LocationDto;
-import com.sthi.re.dto.response.ProjectBrochureDto;
-import com.sthi.re.dto.response.ProjectCardResponse;
-import com.sthi.re.dto.response.ProjectCreateResponse;
-import com.sthi.re.dto.response.ProjectDetailResponse;
-import com.sthi.re.dto.response.ProjectDocumentDto;
-import com.sthi.re.dto.response.ProjectVideoDto;
-import com.sthi.re.dto.response.ProjectUnitTypeDto;
-import com.sthi.re.model.ConstructionStatus;
-import com.sthi.re.model.Developer;
-import com.sthi.re.model.Location;
-import com.sthi.re.model.Project;
-import com.sthi.re.model.ProjectAdvisor;
-import com.sthi.re.model.ProjectAmenity;
-import com.sthi.re.model.ProjectBrochure;
-import com.sthi.re.model.ProjectDocument;
-import com.sthi.re.model.ProjectImage;
-import com.sthi.re.model.ProjectTag;
-import com.sthi.re.model.ProjectType;
-import com.sthi.re.model.ProjectUnitType;
-import com.sthi.re.model.ProjectVideo;
-import com.sthi.re.repo.AmenityRepository;
-import com.sthi.re.repo.ConstructionStatusRepository;
-import com.sthi.re.repo.DeveloperRepository;
-import com.sthi.re.repo.ProjectRepository;
-import com.sthi.re.repo.ProjectTypeRepository;
-import com.sthi.re.repo.ProjectUnitTypeRepository;
-import com.sthi.re.repo.UnitTypeRepository;
+import com.sthi.re.dto.request.*;
+import com.sthi.re.dto.response.*;
+import com.sthi.re.enums.PriceUnit;
+import com.sthi.re.enums.SourceType;
+import com.sthi.re.model.*;
+import com.sthi.re.repo.*;
 import com.sthi.re.service.ProjectService;
-import com.sthi.re.repo.LocationRepository;
-import com.sthi.re.repo.ProjectAmenityRepository;
-import com.sthi.re.repo.ProjectBrochureRepository;
-import com.sthi.re.repo.ProjectCardRepository;
-import com.sthi.re.repo.ProjectImageRepository;
-import com.sthi.re.repo.UnitTypeRepository;
-import com.sthi.re.dto.response.ProjectImageDto;
-import com.sthi.re.dto.response.ProjectListResponse;
 import com.sthi.re.service.R2StorageService;
-
-import com.sthi.re.repo.UserRepository;
-import com.sthi.re.repo.ProjectAdvisorRepository;
-import com.sthi.re.repo.ProjectDocumentRepository;
-import com.sthi.re.repo.ProjectVideoRepository;
-import com.sthi.re.repo.ProjectTagRepository;
-
-import org.springframework.transaction.annotation.Transactional;
-
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.HashSet;
 
 @Service
 public class ProjectServiceImpl implements ProjectService {
@@ -161,8 +104,23 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     private boolean isValidSourceType(String sourceType) {
-        return SOURCE_TYPE_MANUAL.equals(sourceType)
-                || SOURCE_TYPE_WEB_SCRAPING.equals(sourceType);
+        try {
+            SourceType.valueOf(sourceType);
+            return true;
+        } catch (Exception e) {
+            return "WEB_SCRAPING".equals(sourceType);
+        }
+    }
+
+    private SourceType mapSourceType(String sourceType) {
+        if ("WEB_SCRAPING".equals(sourceType)) {
+            return SourceType.SCRAPER;
+        }
+        try {
+            return SourceType.valueOf(sourceType);
+        } catch (Exception e) {
+            return SourceType.MANUAL;
+        }
     }
 
     private String normalizeSourceName(String sourceName) {
@@ -171,6 +129,14 @@ public class ProjectServiceImpl implements ProjectService {
         }
         String trimmed = sourceName.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private boolean isAdmin(Integer userId) {
+        if (userId == null)
+            return false;
+        return userRepository.findById(userId)
+                .map(u -> u.getUserTypeId() != null && u.getUserTypeId() == 1)
+                .orElse(false);
     }
 
     // AddPROJECTSERVICE
@@ -235,7 +201,7 @@ public class ProjectServiceImpl implements ProjectService {
         project.setPossessionDate(request.getPossessionDate());
 
         project.setWebsiteUrl(request.getWebsiteUrl());
-        project.setSourceType(sourceType);
+        project.setSourceType(mapSourceType(sourceType));
         project.setSourceName(sourceName);
         project.setIsVerified(
                 request.getIsVerified() != null && request.getIsVerified() ? 1 : 0);
@@ -304,7 +270,7 @@ public class ProjectServiceImpl implements ProjectService {
                         p.setSizeSqft(ut.getSizeSqft());
                         p.setPriceMin(ut.getPriceMin());
                         p.setPriceMax(ut.getPriceMax());
-                        p.setPriceUnit(ut.getPriceUnit());
+                        p.setPriceUnit(ut.getPriceUnit() != null ? PriceUnit.valueOf(ut.getPriceUnit()) : null);
                         p.setCreatedAt(LocalDateTime.now());
                         projectUnitTypeRepository.save(p);
                     });
@@ -456,7 +422,7 @@ public class ProjectServiceImpl implements ProjectService {
 
         String sourceType = request.getSourceType() != null
                 ? normalizeSourceType(request.getSourceType())
-                : project.getSourceType();
+                : (project.getSourceType() != null ? project.getSourceType().name() : null);
         String sourceName = request.getSourceName() != null
                 ? normalizeSourceName(request.getSourceName())
                 : project.getSourceName();
@@ -469,7 +435,7 @@ public class ProjectServiceImpl implements ProjectService {
         }
 
         if (request.getSourceType() != null) {
-            project.setSourceType(sourceType);
+            project.setSourceType(mapSourceType(sourceType));
         }
         if (request.getSourceName() != null) {
             project.setSourceName(sourceName);
@@ -525,7 +491,7 @@ public class ProjectServiceImpl implements ProjectService {
                 p.setSizeSqft(ut.getSizeSqft());
                 p.setPriceMin(ut.getPriceMin());
                 p.setPriceMax(ut.getPriceMax());
-                p.setPriceUnit(ut.getPriceUnit());
+                p.setPriceUnit(ut.getPriceUnit() != null ? PriceUnit.valueOf(ut.getPriceUnit()) : null);
                 p.setCreatedAt(LocalDateTime.now());
 
                 projectUnitTypeRepository.save(p);
@@ -739,43 +705,10 @@ public class ProjectServiceImpl implements ProjectService {
         response.setStatus(project.getStatus() != null && project.getStatus() == 1
                 ? "ACTIVE"
                 : "DELETED");
-        response.setSourceType(project.getSourceType());
+        response.setSourceType(project.getSourceType() != null ? project.getSourceType().name() : null);
         response.setSourceName(project.getSourceName());
 
         response.setDeveloperId(project.getDeveloperId());
-        response.setProjectTypeId(project.getProjectTypeId());
-        response.setCreatedAt(project.getCreatedAt());
-        response.setUpdatedAt(project.getUpdatedAt());
-
-        // ---------- Construction Status mapping ----------
-        if (project.getConstructionStatusid() != null) {
-
-            constructionStatusRepository
-                    .findByConstructionStatusIdAndIsActive(
-                            project.getConstructionStatusid(), 1)
-                    .ifPresent(status -> response.setConstructionStatus(status.getLabel()));
-        }
-
-        // ---------- Location mapping ----------
-        Location location = locationRepository
-                .findByProjectId(project.getProjectId())
-                .orElseThrow(() -> new IllegalArgumentException("Location not found"));
-
-        if (location != null) {
-            LocationDto locDto = new LocationDto();
-            locDto.setLocationId(location.getLocationId());
-            locDto.setProjectId(location.getProjectId());
-            locDto.setLatitude(location.getLatitude());
-            locDto.setLongitude(location.getLongitude());
-            locDto.setCity(location.getCity());
-            locDto.setArea(location.getArea());
-            locDto.setZone(location.getZone());
-            locDto.setAddressLine(location.getAddressLine());
-            locDto.setCreatedAt(location.getCreatedAt());
-            locDto.setUpdatedAt(location.getUpdatedAt());
-
-            response.setLocation(locDto);
-        }
 
         // ---------- Unit Types mapping ----------
         List<ProjectUnitType> projectUnitTypes = projectUnitTypeRepository.findByProjectId(project.getProjectId());
@@ -791,7 +724,7 @@ public class ProjectServiceImpl implements ProjectService {
             dto.setSizeSqft(ut.getSizeSqft());
             dto.setPriceMin(ut.getPriceMin());
             dto.setPriceMax(ut.getPriceMax());
-            dto.setPriceUnit(ut.getPriceUnit());
+            dto.setPriceUnit(ut.getPriceUnit() != null ? ut.getPriceUnit().name() : null);
             dto.setCreatedAt(ut.getCreatedAt());
             dto.setUpdatedAt(ut.getUpdatedAt());
 
@@ -897,12 +830,17 @@ public class ProjectServiceImpl implements ProjectService {
     ////////// GetProjectCards//////////////
 
     @Override
-    @Cacheable(value = "project-cards")
+    @Cacheable(value = "project-cards", key = "#loggedInUserId")
     @Transactional(readOnly = true)
-    public List<ProjectCardResponse> listProjectCards() {
+    public List<ProjectCardResponse> listProjectCards(Integer loggedInUserId) {
 
-        // 1️⃣ Fetch main card data (ONE query)
-        List<ProjectCardResponse> cards = projectCardRepository.findProjectCards();
+        // 1️⃣ Check if Admin
+        boolean admin = isAdmin(loggedInUserId);
+
+        // 2️⃣ Fetch main card data
+        List<ProjectCardResponse> cards = admin
+                ? projectCardRepository.findAllProjectCards()
+                : projectCardRepository.findProjectCards();
 
         if (cards.isEmpty()) {
             return cards;
@@ -953,10 +891,15 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ProjectCardResponse> searchProjects(ProjectSearchRequest request) {
+    public List<ProjectCardResponse> searchProjects(ProjectSearchRequest request, Integer loggedInUserId) {
 
-        // 1️⃣ Fetch active projects
-        List<Project> projects = projectRepository.findByStatus(1);
+        // 1️⃣ Determine if admin
+        boolean admin = isAdmin(loggedInUserId);
+
+        // 2️⃣ Fetch active projects (Admin sees all, public sees only verified)
+        List<Project> projects = admin
+                ? projectRepository.findByStatus(1)
+                : projectRepository.findByStatusAndIsVerified(1, 1);
 
         if (projects.isEmpty()) {
             return List.of();
@@ -1175,6 +1118,62 @@ public class ProjectServiceImpl implements ProjectService {
         return EARTH_RADIUS * c;
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProjectCardResponse> listUnverifiedProjectCards() {
+
+        List<ProjectCardResponse> cards = projectCardRepository.findUnverifiedProjectCards();
+
+        if (cards.isEmpty()) {
+            return cards;
+        }
+
+        for (ProjectCardResponse card : cards) {
+            String rawImagePath = card.getCoverImageUrl();
+            if (rawImagePath != null && !rawImagePath.isBlank()) {
+                card.setCoverImageUrl(buildPublicUrl(rawImagePath));
+            }
+        }
+
+        List<Long> projectIds = cards.stream()
+                .map(ProjectCardResponse::getProjectId)
+                .toList();
+
+        List<Object[]> bhkRows = projectUnitTypeRepository.findBhkTypesByProjectIds(projectIds);
+        Map<Long, Set<Integer>> bhkMap = new HashMap<>(projectIds.size());
+
+        for (Object[] row : bhkRows) {
+            Long projectId = (Long) row[0];
+            Integer bhk = (Integer) row[1];
+            bhkMap.computeIfAbsent(projectId, k -> new HashSet<>()).add(bhk);
+        }
+
+        for (ProjectCardResponse card : cards) {
+            List<Integer> bhks = new ArrayList<>(bhkMap.getOrDefault(card.getProjectId(), Set.of()));
+            Collections.sort(bhks);
+            card.setBhkTypes(bhks);
+        }
+
+        return cards;
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = "project-cards", allEntries = true)
+    public ProjectCreateResponse verifyProject(Long projectId, Integer adminUserId) {
+
+        Project project = projectRepository.findByProjectIdAndStatus(projectId, 1)
+                .orElseThrow(() -> new IllegalArgumentException("Project not found"));
+
+        project.setIsVerified(1);
+        project.setUpdatedBy(adminUserId);
+        project.setUpdatedAt(LocalDateTime.now());
+
+        projectRepository.save(project);
+
+        return new ProjectCreateResponse(projectId, "Project verified and published successfully");
+    }
+
     private ProjectCardResponse buildProjectCard(
             Project project,
             Map<Long, List<ProjectUnitType>> unitMap,
@@ -1243,7 +1242,7 @@ public class ProjectServiceImpl implements ProjectService {
                         ? ut.getPriceMax()
                         : Math.max(maxPrice, ut.getPriceMax());
 
-            priceUnit = ut.getPriceUnit();
+            priceUnit = ut.getPriceUnit() != null ? ut.getPriceUnit().name() : null;
         }
 
         card.setMinPrice(minPrice);

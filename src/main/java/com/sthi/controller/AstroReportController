@@ -1,0 +1,50 @@
+package com.sthi.controller;
+
+import com.sthi.dto.request.ReportRequest;
+import com.sthi.dto.response.ReportContent;
+import com.sthi.service.astro.AstroCalculationService;
+import com.sthi.service.ai.AiReportService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.Instant;
+
+@RestController
+@RequestMapping("/api/v1/report")
+@RequiredArgsConstructor
+@Validated
+@Slf4j
+public class AstroReportController {
+    
+    private final AstroCalculationService astroCalculationService;
+    private final AiReportService aiReportService;
+    
+    @PostMapping("/generate")
+    public ResponseEntity<ReportContent> generateReport(@Valid @RequestBody ReportRequest request) {
+        log.info("Generating astrology report for: {}", request.getName());
+        
+        // Calculate astrological data
+        var astroData = astroCalculationService.calculate(request);
+        
+        // Generate AI report
+        var reportContent = aiReportService.generateReport(astroData, request.getReportLanguage());
+        
+        // Build final response
+        var report = new ReportContent();
+        report.setGeneratedAt(Instant.now());
+        report.setAstroData(astroData);
+        report.setReport(reportContent);
+        
+        log.info("Report generated successfully for: {}", request.getName());
+        return ResponseEntity.ok(report);
+    }
+    
+    @GetMapping("/health")
+    public ResponseEntity<String> healthCheck() {
+        return ResponseEntity.ok("Astrology Report Service is running");
+    }
+}

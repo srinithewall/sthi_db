@@ -1,0 +1,177 @@
+package com.sthi.service.ai;
+
+import com.sthi.dto.response.AstroData;
+import com.sthi.dto.response.ReportContent;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
+
+import java.util.List;
+import java.util.Map;
+
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class AiReportService {
+    
+    // Option 1: Use @Qualifier with the exact bean name from WebClientConfig
+    @Qualifier("aiWebClient")
+    private final WebClient webClient;
+    
+    // Option 2: OR rename the field to match the bean name (without @Qualifier)
+    // private final WebClient aiWebClient;
+
+    @Value("${ai.model:gpt-4}")
+    private String model;
+
+    @Value("${ai.temperature:0.7}")
+    private Double temperature;
+
+    public ReportContent generateReport(AstroData astroData, String language) {
+        try {
+            String prompt = buildPrompt(astroData, language);
+            log.info("Generating AI report with prompt length: {}", prompt.length());
+            
+            OpenAIResponse response = callOpenAI(prompt).block();
+            
+            if (response != null && response.getChoices() != null && !response.getChoices().isEmpty()) {
+                String content = response.getChoices().get(0).getMessage().getContent();
+                log.info("AI response received, length: {}", content.length());
+                return parseAiResponse(content);
+            }
+            
+            log.error("Empty or invalid response from OpenAI");
+            return createFallbackReport(astroData);
+            
+        } catch (Exception e) {
+            log.error("Error generating AI report", e);
+            return createFallbackReport(astroData);
+        }
+    }
+
+    private String buildPrompt(AstroData astroData, String language) {
+        return String.format("""
+            Generate a Cosmic Self-Blueprint report in %s.
+            Astrological Data:
+            - Lagna (Ascendant): %s
+            - Sun Sign: %s
+            - Moon Sign: %s
+            - Nakshatra: %s (Pada %d)
+            - Doshas: %s
+            - Tithi: %s, Yoga: %s, Karana: %s
+
+            Please structure the report as follows:
+            1. Self Essence (core spiritual purpose)
+            2. General Characteristics (personality traits)
+            3. Soul Desires (deepest longings)
+            4. Dosha Explanations (meanings of each dosha present)
+            5. Remedies (specific rituals, mantras, gemstones)
+            6. Current Month Transit Effects (based on today's transits)
+
+            Use insightful, compassionate language suitable for a life‑guidance report.
+            """,
+            language, astroData.getLagna(), astroData.getSunSign(),
+            astroData.getMoonSign(), astroData.getNakshatra(), astroData.getPada(),
+            String.join(", ", astroData.getDoshas()), astroData.getTithi(),
+            astroData.getYoga(), astroData.getKarana());
+    }
+
+    private Mono<OpenAIResponse> callOpenAI(String prompt) {
+        return webClient.post()
+                .uri("/chat/completions") // Relative URL since base URL is configured in WebClientConfig
+                .bodyValue(Map.of(
+                    "model", model,
+                    "messages", List.of(
+                        Map.of("role", "system", "content", "You are a wise Vedic astrologer."),
+                        Map.of("role", "user", "content", prompt)
+                    ),
+                    "temperature", temperature,
+                    "max_tokens", 4000,
+                    "top_p", 1.0
+                ))
+                .retrieve()
+                .bodyToMono(OpenAIResponse.class)
+                .doOnError(error -> log.error("OpenAI API error: {}", error.getMessage()));
+    }
+
+    private ReportContent parseAiResponse(String content) {
+        ReportContent report = new ReportContent();
+        
+        // Simple parsing - split by numbered sections
+        String[] sections = content.split("\\d+\\.\\s+");
+        
+        if (sections.length > 1) {
+            report.setSelfEssence(cleanSection(sections[1], "Self Essence"));
+        }
+        if (sections.length > 2) {
+            report.setCoreCharacteristics(cleanSection(sections[2], "General Characteristics"));
+        }
+        if (sections.length > 3) {
+            report.setSoulDesires(cleanSection(sections[3], "Soul Desires"));
+        }
+        if (sections.length > 4) {
+            report.setDoshaExplanation(cleanSection(sections[4], "Dosha Explanations"));
+        }
+        if (sections.length > 5) {
+            report.setRemedies(cleanSection(sections[5], "Remedies"));
+        }
+        if (sections.length > 6) {
+            report.setMonthlyOutlook(cleanSection(sections[6], "Current Month Transit Effects"));
+        }
+        
+        return report;
+    }
+
+    private String cleanSection(String section, String sectionName) {
+        // Remove the section name and clean up
+        String content = section.replace(sectionName, "").trim();
+        // Remove any markdown formatting and extra whitespace
+        content = content.replaceAll("[#*`]", "").trim();
+        content = content.replaceAll("\\n{3,}", "\n\n");
+        return content;
+    }
+
+    private ReportContent createFallbackReport(AstroData astroData) {
+        ReportContent content = new ReportContent();
+        content.setSelfEssence("Based on your Lagna " + astroData.getLagna() + 
+                              " and Moon in " + astroData.getMoonSign() + 
+                              ", your spiritual essence is oriented towards...");
+        content.setCoreCharacteristics("Your personality shows traits of " + 
+                                      astroData.getSunSign() + " sun sign combined with " + 
+                                      astroData.getLagna() + " ascendant.");
+        content.setDoshaExplanation("Doshas identified: " + String.join(", ", astroData.getDoshas()));
+        content.setRemedies("Consult with a Vedic astrologer for personalized remedies.");
+        return content;
+    }
+
+    // DTO for AI response
+    public static class OpenAIResponse {
+        private String id;
+        private List<Choice> choices;
+        
+        // Getters and setters
+        public String getId() { return id; }
+        public void setId(String id) { this.id = id; }
+        
+        public List<Choice> getChoices() { return choices; }
+        public void setChoices(List<Choice> choices) { this.choices = choices; }
+    }
+
+    public static class Choice {
+        private Message message;
+        
+        public Message getMessage() { return message; }
+        public void setMessage(Message message) { this.message = message; }
+    }
+
+    public static class Message {
+        private String content;
+        
+        public String getContent() { return content; }
+        public void setContent(String content) { this.content = content; }
+    }
+}
