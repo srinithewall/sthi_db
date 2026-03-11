@@ -51,9 +51,11 @@
 
 <!-- Swiss Ephemeris Java Port (Thomas Mack) -->
 <dependency>
-    <groupId>swisseph</groupId>    <!-- Changed from com.astro to swisseph -->
+    <groupId>swisseph</groupId>
     <artifactId>swisseph</artifactId>
     <version>2.00.00</version>
+    <scope>system</scope>
+    <systemPath>${project.basedir}/libs/swisseph-2.00.00.jar</systemPath>
 </dependency>
 
 <dependency>
@@ -189,6 +191,9 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<includeSystemScope>true</includeSystemScope>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>
