@@ -33,8 +33,9 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           source: "target/*.jar"
-          target: "/home/ubuntu/sthi-backend/"
+          target: "/home/ubuntu/myproject/"
           strip_components: 1
+          use_insecure_cipher: true
 
       - name: Restart Docker Compose Service
         uses: appleboy/ssh-action@v1.0.3
@@ -42,10 +43,10 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          use_insecure_cipher: true
           script: |
             # Navigate to the directory containing your docker-compose.yml on EC2
-            # TODO: Update this path if your docker setup is located elsewhere
-            cd /home/ubuntu/sthi-backend/
+            cd /home/ubuntu/myproject/
             
             # Restart the Spring Boot service
             sudo docker-compose stop st_app
