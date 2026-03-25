@@ -25,6 +25,9 @@ public class ProjectImageRequest {
      */
     private Boolean remove;
 
+    private String imageType;
+    private Integer fileSize;
+
     // =========================
     // Getters & Setters
     // =========================
@@ -59,5 +62,21 @@ public class ProjectImageRequest {
 
     public void setRemove(Boolean remove) {
         this.remove = remove;
+    }
+
+    public String getImageType() {
+        return imageType;
+    }
+
+    public void setImageType(String imageType) {
+        this.imageType = imageType;
+    }
+
+    public Integer getFileSize() {
+        return fileSize;
+    }
+
+    public void setFileSize(Integer fileSize) {
+        this.fileSize = fileSize;
     }
 }

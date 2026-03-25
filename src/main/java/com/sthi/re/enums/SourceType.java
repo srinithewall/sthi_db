@@ -4,5 +4,6 @@ public enum SourceType {
     MANUAL,
     SCRAPER,
     API,
-    IMPORT
+    IMPORT,
+    WEB_SCRAPING
 }

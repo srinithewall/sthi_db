@@ -61,6 +61,9 @@ public class Project {
     @Column(name = "scraper_source")
     private String scraperSource;
 
+    @Column(name = "source_updated_at")
+    private LocalDateTime sourceUpdatedAt;
+
     /**
      * 1 = Verified
      * 0 = Not Verified
@@ -238,5 +241,13 @@ public class Project {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public LocalDateTime getSourceUpdatedAt() {
+        return sourceUpdatedAt;
+    }
+
+    public void setSourceUpdatedAt(LocalDateTime sourceUpdatedAt) {
+        this.sourceUpdatedAt = sourceUpdatedAt;
     }
 }

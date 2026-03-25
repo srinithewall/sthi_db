@@ -19,6 +19,7 @@ public class AddProjectRequest {
     private Boolean isVerified;
     private String sourceType;
     private String sourceName;
+    private String sourceUpdatedAt;
 
     // ---------- Location ----------
     private LocationRequest location;
@@ -133,6 +134,14 @@ public class AddProjectRequest {
 
     public void setSourceName(String sourceName) {
         this.sourceName = sourceName;
+    }
+
+    public String getSourceUpdatedAt() {
+        return sourceUpdatedAt;
+    }
+
+    public void setSourceUpdatedAt(String sourceUpdatedAt) {
+        this.sourceUpdatedAt = sourceUpdatedAt;
     }
 
     public LocationRequest getLocation() {

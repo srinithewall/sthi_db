@@ -1,5 +1,6 @@
 package com.sthi.re.model;
 
+import com.sthi.re.enums.ImageType;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -29,6 +30,13 @@ public class ProjectImage {
     
     @Column(name = "status")
     private Integer status; // 1 = Active, 0 = Deleted
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "image_type")
+    private ImageType imageType;
+
+    @Column(name = "file_size")
+    private Integer fileSize;
 
     public Long getProjectImageId() {
         return projectImageId;
@@ -84,6 +92,22 @@ public class ProjectImage {
 
     public void setStatus(Integer status) {
         this.status = status;
+    }
+
+    public ImageType getImageType() {
+        return imageType;
+    }
+
+    public void setImageType(ImageType imageType) {
+        this.imageType = imageType;
+    }
+
+    public Integer getFileSize() {
+        return fileSize;
+    }
+
+    public void setFileSize(Integer fileSize) {
+        this.fileSize = fileSize;
     }
 
 }

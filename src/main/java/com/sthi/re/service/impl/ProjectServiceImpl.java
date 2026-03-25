@@ -5,6 +5,7 @@ import com.sthi.re.dto.request.*;
 import com.sthi.re.dto.response.*;
 import com.sthi.re.enums.PriceUnit;
 import com.sthi.re.enums.SourceType;
+import com.sthi.re.enums.ImageType;
 import com.sthi.re.model.*;
 import com.sthi.re.repo.*;
 import com.sthi.re.service.ProjectService;
@@ -139,6 +140,22 @@ public class ProjectServiceImpl implements ProjectService {
                 .orElse(false);
     }
 
+    private LocalDateTime parseDateTime(String dt) {
+        if (dt == null || dt.isBlank()) {
+            return null;
+        }
+        try {
+            // Handle ISO-8601 with Z or offset
+            return java.time.OffsetDateTime.parse(dt).toLocalDateTime();
+        } catch (Exception e) {
+            try {
+                return LocalDateTime.parse(dt);
+            } catch (Exception ex) {
+                return null;
+            }
+        }
+    }
+
     // AddPROJECTSERVICE
 
     @Override
@@ -203,6 +220,7 @@ public class ProjectServiceImpl implements ProjectService {
         project.setWebsiteUrl(request.getWebsiteUrl());
         project.setSourceType(mapSourceType(sourceType));
         project.setSourceName(sourceName);
+        project.setSourceUpdatedAt(parseDateTime(request.getSourceUpdatedAt()));
         project.setIsVerified(
                 request.getIsVerified() != null && request.getIsVerified() ? 1 : 0);
 
@@ -222,6 +240,7 @@ public class ProjectServiceImpl implements ProjectService {
         location.setZone(loc.getZone());
         location.setArea(loc.getArea());
         location.setCity(loc.getCity());
+        location.setAddressLine(loc.getAddressLine());
         location.setLatitude(loc.getLatitude());
         location.setLongitude(loc.getLongitude());
         location.setCreatedAt(LocalDateTime.now());
@@ -303,6 +322,8 @@ public class ProjectServiceImpl implements ProjectService {
                 pi.setProjectId(savedProject.getProjectId());
                 pi.setImageUrl(imageUrl);
                 pi.setSortOrder(img.getSortOrder());
+                pi.setImageType(img.getImageType() != null ? ImageType.valueOf(img.getImageType()) : null);
+                pi.setFileSize(img.getFileSize());
                 pi.setCreatedAt(LocalDateTime.now());
 
                 projectImageRepository.save(pi);
@@ -440,6 +461,9 @@ public class ProjectServiceImpl implements ProjectService {
         if (request.getSourceName() != null) {
             project.setSourceName(sourceName);
         }
+        if (request.getSourceUpdatedAt() != null) {
+            project.setSourceUpdatedAt(parseDateTime(request.getSourceUpdatedAt()));
+        }
 
         if (request.getIsVerified() != null)
             project.setIsVerified(request.getIsVerified() ? 1 : 0);
@@ -469,6 +493,7 @@ public class ProjectServiceImpl implements ProjectService {
             location.setZone(loc.getZone());
             location.setArea(loc.getArea());
             location.setCity(loc.getCity());
+            location.setAddressLine(loc.getAddressLine());
             location.setLatitude(loc.getLatitude());
             location.setLongitude(loc.getLongitude());
         }
@@ -597,6 +622,8 @@ public class ProjectServiceImpl implements ProjectService {
                     newImage.setProjectId(projectId);
                     newImage.setImageUrl(imageUrl);
                     newImage.setSortOrder(img.getSortOrder());
+                    newImage.setImageType(img.getImageType() != null ? ImageType.valueOf(img.getImageType()) : null);
+                    newImage.setFileSize(img.getFileSize());
                     newImage.setStatus(1);
                     newImage.setCreatedAt(LocalDateTime.now());
 
@@ -707,6 +734,7 @@ public class ProjectServiceImpl implements ProjectService {
                 : "DELETED");
         response.setSourceType(project.getSourceType() != null ? project.getSourceType().name() : null);
         response.setSourceName(project.getSourceName());
+        response.setSourceUpdatedAt(project.getSourceUpdatedAt());
 
         response.setDeveloperId(project.getDeveloperId());
 
@@ -755,6 +783,8 @@ public class ProjectServiceImpl implements ProjectService {
             ProjectImageDto dto = new ProjectImageDto();
             dto.setImageUrl(buildPublicUrl(img.getImageUrl()));
             dto.setSortOrder(img.getSortOrder());
+            dto.setImageType(img.getImageType());
+            dto.setFileSize(img.getFileSize());
 
             imageDtos.add(dto);
         }

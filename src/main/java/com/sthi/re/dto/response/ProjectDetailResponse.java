@@ -12,6 +12,7 @@ public class ProjectDetailResponse {
     private String status;
     private String sourceType;
     private String sourceName;
+    private LocalDateTime sourceUpdatedAt;
 
     private Long developerId;
     private Integer projectTypeId;
@@ -56,6 +57,9 @@ public class ProjectDetailResponse {
 
     public String getSourceName() { return sourceName; }
     public void setSourceName(String sourceName) { this.sourceName = sourceName; }
+
+    public LocalDateTime getSourceUpdatedAt() { return sourceUpdatedAt; }
+    public void setSourceUpdatedAt(LocalDateTime sourceUpdatedAt) { this.sourceUpdatedAt = sourceUpdatedAt; }
 
     public Long getDeveloperId() { return developerId; }
     public void setDeveloperId(Long developerId) { this.developerId = developerId; }

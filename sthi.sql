@@ -410,7 +410,8 @@ CREATE TABLE `re_projects` (
   `is_verified` int DEFAULT NULL,
   `website_url` varchar(255) DEFAULT NULL,
   `source_name` varchar(255) DEFAULT NULL,
-  `source_type` varchar(255) DEFAULT NULL
+  `source_type` varchar(255) DEFAULT NULL,
+  `source_updated_at` datetime(6) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -905,7 +906,9 @@ CREATE TABLE `re_project_images` (
   `project_id` bigint DEFAULT NULL,
   `sort_order` int DEFAULT NULL,
   `updated_at` datetime(6) DEFAULT NULL,
-  `status` int DEFAULT NULL
+  `status` int DEFAULT NULL,
+  `image_type` varchar(255) DEFAULT NULL,
+  `file_size` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
