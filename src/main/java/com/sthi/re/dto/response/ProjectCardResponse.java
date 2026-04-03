@@ -26,6 +26,9 @@ public class ProjectCardResponse {
 
     // Image
     private String coverImageUrl;
+    
+    // Website URL
+    private String websiteUrl;
 
     // ✅ Constructor for JPQL projection
     public ProjectCardResponse(
@@ -41,7 +44,8 @@ public class ProjectCardResponse {
             LocalDate possessionDate,
             String developerName,
             String projectType,
-            String coverImageUrl) {
+            String coverImageUrl,
+            String websiteUrl) {
         this.projectId = projectId;
         this.projectName = projectName;
         this.city = city;
@@ -55,12 +59,21 @@ public class ProjectCardResponse {
         this.developerName = developerName;
         this.projectType = projectType;
         this.coverImageUrl = coverImageUrl;
+        this.websiteUrl = websiteUrl;
     }
 
     public ProjectCardResponse() {
     }
 
     // getters & setters
+    public String getWebsiteUrl() {
+        return websiteUrl;
+    }
+
+    public void setWebsiteUrl(String websiteUrl) {
+        this.websiteUrl = websiteUrl;
+    }
+
     public Long getProjectId() {
         return projectId;
     }

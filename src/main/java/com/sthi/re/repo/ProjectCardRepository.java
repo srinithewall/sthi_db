@@ -24,7 +24,8 @@ public interface ProjectCardRepository extends JpaRepository<Project, Long> {
 			    p.possessionDate,
 			    d.developerName,
 			    pt.name,
-			    pi.imageUrl
+			    pi.imageUrl,
+			    p.websiteUrl
 			)
 			from Project p
 			left join Location l on l.projectId = p.projectId
@@ -63,7 +64,8 @@ public interface ProjectCardRepository extends JpaRepository<Project, Long> {
 			    p.possessionDate,
 			    d.developerName,
 			    pt.name,
-			    pi.imageUrl
+			    pi.imageUrl,
+			    p.websiteUrl
 			)
 			from Project p
 			left join Location l on l.projectId = p.projectId
@@ -102,7 +104,8 @@ public interface ProjectCardRepository extends JpaRepository<Project, Long> {
 			    p.possessionDate,
 			    d.developerName,
 			    pt.name,
-			    pi.imageUrl
+			    pi.imageUrl,
+			    p.websiteUrl
 			)
 			from Project p
 			left join Location l on l.projectId = p.projectId
@@ -123,7 +126,8 @@ public interface ProjectCardRepository extends JpaRepository<Project, Long> {
 			    p.possessionDate,
 			    d.developerName,
 			    pt.name,
-			    pi.imageUrl
+			    pi.imageUrl,
+			    p.websiteUrl
 			""")
 	List<ProjectCardResponse> findAllProjectCards();
 
